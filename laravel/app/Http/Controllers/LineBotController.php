@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Gurunavi;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use LINE\LINEBot;
@@ -15,7 +16,7 @@ class LineBotController extends Controller
         return view('linebot.index'); // linebotフォルダの中のindexという名前のviewファイルを表示
     }
 
-    public function parrot(Request $request)
+    public function restaurants(Request $request)
     {
         // ログ出力設定
         Log::debug($request -> header());
@@ -43,8 +44,26 @@ class LineBotController extends Controller
                 continue;
             }
 
+            $gurunavi = new Gurunavi();
+            $gurunaviResponse = $gurunavi->searchRestaurants($event->getText());
+
+            // ぐるなびAPIのレスポンスがエラーの場合を考慮した処理
+            if (array_key_exists('error', $gurunaviResponse)) {
+                $replyText = $gurunaviResponse['error'][0]['message'];
+                $replyToken = $event->getReplyToken();
+                $lineBot->replyText($replyToken, $replyText);
+                continue;
+            }
+
+            $replyText = '';
+            foreach($gurunaviResponse['rest'] as $restaurant) {
+                $replyText .=
+                    $restaurant['name'] . "\n" .
+                    $restaurant['url'] . "\n" .
+                    "\n";
+            }
+
             $replyToken = $event -> getReplyToken();
-            $replyText = $event -> getText();
             $lineBot -> replyText($replyToken, $replyText);
         }
     }
